@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Colors - TRP</title>
+    <script src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+    <!-- Cast Debug Logger -->
+    <script src="//www.gstatic.com/cast/sdk/libs/devtools/debug_layer/caf_receiver_logger.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/two.js/0.8.5/two.min.js"
+        integrity="sha512-4ApdGvTeYiOYSUhgkCowGWXlpydAzvTeNQDeRdqa6iN8kJuzZP+VaAslSF5ecD2usF+qt5qJUew4080jxZZbGw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+</head>
+
+<body>
+    <script>
+        function circ(timeFraction) {
+            return 1 - Math.sin(Math.acos(timeFraction));
+        }
+
+        var two = new Two({
+            fullscreen: true,
+            autostart: true,
+        }).appendTo(document.body);
+        // two.renderer.domElement.style.background = 'rgb(225, 253, 253)';
+        two.renderer.domElement.style.background = '#80BDE3';
+
+        var castDebugLogger = cast.debug.CastDebugLogger.getInstance();
+        var context = cast.framework.CastReceiverContext.getInstance();
+        var SHOWING_DEBUG_LOGS = false;
+
+        context.addEventListener(cast.framework.system.EventType.READY, () => {
+            /* if (!castDebugLogger.debugOverlayElement_) {
+                // Enable debug logger and show a 'DEBUG MODE' overlay at top left corner.
+                castDebugLogger.setEnabled(true);
+                // Show debug overlay
+                // SHOWING_DEBUG_LOGS = true;
+                // castDebugLogger.showDebugLogs(true);
+            } */
+        });
+
+        var background = two.makeGroup();
+
+        //Texture from png
+        var rainbow_texture = new Two.Texture('/assets/rainbow.svg', function () {
+            var shape = new Two.Rectangle(0, 0, two.width, two.height);
+            shape.noStroke().fill = rainbow_texture;
+            var scale = Math.max(two.width / rainbow_texture.image.width, two.height / rainbow_texture.image.height);
+            shape.scale = scale;
+            shape.translation.addSelf(new Two.Vector(two.width / 2, two.height / 2));
+            background.add(shape);
+        });
+
+        var cloud_assets = [
+            {
+                url: '/assets/cloud01.svg',
+                position: [35, 24],
+                scale: 1
+            },
+            {
+                url: '/assets/cloud01.svg',
+                position: [69, 3],
+                scale: 1.1
+            },
+            {
+                url: '/assets/cloud02.svg',
+                position: [80, 52],
+                scale: 1
+            },
+            {
+                url: '/assets/cloud01.svg',
+                position: [117, 15],
+                scale: 0.8
+            },
+        ];
+
+        cloud_assets.forEach(function (cloud_asset, index) {
+            var cloud_texture = new Two.Texture(cloud_asset.url, function () {
+                var desiredWidth = 0.22;
+                var w2hRatio = cloud_texture.image.width / cloud_texture.image.height;
+                var baseScale = two.width * desiredWidth / cloud_texture.image.width;
+
+                var shape = new Two.Rectangle(
+                    two.width / 100 * cloud_asset.position[0], two.height / 100 * cloud_asset.position[1],
+                    cloud_texture.image.width, cloud_texture.image.height);
+                shape.noStroke().fill = cloud_texture;
+
+                shape.scale = baseScale * cloud_asset.scale;
+                background.children.splice(0, 0, shape);
+
+                var tBounce = Math.random() * Math.PI * 2, tWind = (shape.translation.x + 0);
+                var bounceSpeed = 0.01;
+                var windSpeed = 0.1 * cloud_texture.scale;
+                var windBound = two.width + shape.width / 2;
+
+                var fn = [Math.sin, Math.cos][(index + 1) % 2];
+
+                two.bind('update', function () {
+
+                    var bounceAnimation = fn(tBounce += bounceSpeed);
+                    tWind -= windSpeed;
+                    var windAnimation = tWind % windBound;
+
+                    var translationModifier = 0.18;
+                    shape.translation.y += bounceAnimation * translationModifier;
+                    shape.translation.x = windAnimation;
+
+                    if (shape.translation.x <= -shape.width / 2) {
+                        tWind = two.width + shape.width / 2;
+                    }
+                });
+            });
+        })
+
+        var title = two.makeGroup();
+
+        var title_texture = new Two.Texture('/assets/title.png', function () {
+            var desiredWidth = 0.6;
+            var baseScale = two.width * desiredWidth / title_texture.image.width;
+
+            var shape = new Two.Rectangle(
+                two.width / 100 * 61, two.height / 100 * 42,
+                title_texture.image.width, title_texture.image.height);
+
+            shape.noStroke().fill = title_texture;
+            var scale = baseScale;
+            shape.scale = scale
+            var t = 0;
+            var speed = 0.03;
+            two.bind('update', function () {
+                var animation = -Math.cos(t += speed);
+                var scaleModifier = 0.035;
+                shape.scale = scale + animation * scaleModifier;
+            });
+            title.add(shape);
+        });
+
+        var game = two.makeGroup();
+        game.translation.set(6 * two.width / 10, two.height / 2);
+        game.opacity = 0;
+
+        var text_texture = new Two.Texture('/assets/instructions.svg', function () {
+            var shape = new Two.Rectangle(0, 0, text_texture.image.width, text_texture.image.height);
+            shape.noStroke().fill = text_texture;
+            var scale = two.width / 4 / text_texture.image.width;
+            shape.scale = scale;
+            shape.translation.x = -6/14 * two.width;
+            game.add(shape);
+        });
+
+        var wheel = new Two.Group();
+        var wheelRadius = 0.45 * two.height;
+        var rouletteWheelBg = new Two.Circle(
+            0, 0,
+            wheelRadius
+        )
+        rouletteWheelBg.noStroke().fill = 'gray';
+        wheel.add(rouletteWheelBg);
+
+        var COLORS = [
+            'lightpink',
+            'purple',
+            'white',
+            'red',
+            'blue',
+            'yellow',
+            'orange',
+            'green',
+            'black',
+            'saddlebrown',
+        ]
+
+        var baseWheelRotation = 1 / 1000 * Math.PI;
+        var currentWheelSpeed = 1;
+        var desiredWheelSpeed = 1;
+        var previousWheelSpeed = 1;
+        var wheelSpeedModifier = 1;
+
+        function frameRotation() {
+            return wheelSpeedModifier * baseWheelRotation;
+            /* 
+            var wheelSpeedDelta = Math.abs(
+                (desiredWheelSpeed * wheelSpeedModifier) - previousWheelSpeed);
+
+            if (wheelSpeedDelta !== 0) {
+                var nextWheelSpeed = currentWheelSpeed * (1 + circ(1/wheelSpeedDelta)); 
+                if (!isNaN(nextWheelSpeed) && nextWheelSpeed !== previousWheelSpeed){
+                    castDebugLogger.info(desiredWheelSpeed, previousWheelSpeed);
+                    previousWheelSpeed = currentWheelSpeed;
+                    currentWheelSpeed = nextWheelSpeed;
+                    return currentWheelSpeed * wheelSpeedModifier * baseWheelRotation;
+                } 
+            } 
+            return previousWheelSpeed * wheelSpeedModifier * baseWheelRotation; */
+        }
+        var CURRENT_COLOR = null;
+        var WHEEL_SPUN = false;
+
+        var segments = [];
+
+        function makeWheel() {
+            game.remove(segments);
+            var rotationUnit = 2 * Math.PI / COLORS.length;
+
+            COLORS.forEach(function (color, index, arr) {
+                var segment = new Two.ArcSegment(
+                    0,
+                    0,
+                    0,
+                    wheelRadius - 5,
+                    0,
+                    2 * Math.PI / arr.length
+                );
+                var angle = rotationUnit * index; // - Math.PI / 2;
+                segment.rotation = angle;
+                segment.noStroke().fill = COLORS[index];
+                segments.push(wheel.add(segment));
+            })
+            two.bind('update', function () {
+                wheel.rotation = (wheel.rotation + frameRotation() % (Math.PI * 2));
+                var currentRotation = (wheel.rotation % (Math.PI * 2)) / rotationUnit;
+                var colorIndex = COLORS.length - Math.floor(currentRotation) - 1;
+                CURRENT_COLOR = COLORS[colorIndex];
+                // if (WHEEL_SPUN) two.renderer.domElement.style.background = CURRENT_COLOR;
+
+                // castDebugLogger.debug("currentColor:", CURRENT_COLOR);
+            });
+            game.add(wheel);
+
+            var indicator = new Two
+                .Polygon(0, 0, two.width / 20, 3)
+            indicator.rotation = -Math.PI / 2;
+            indicator.translation.x += wheelRadius;
+            indicator.stroke = 'gray';
+            indicator.fill = '#aaaaaa';
+            segments.push(indicator);
+            game.add(indicator);
+        }
+
+        makeWheel();
+
+        const options = new cast.framework.CastReceiverOptions();
+        options.disableIdleTimeout = true;
+        options.maxInactivity = 30; // Development only
+        // options.maxInactivity = 60 * 60 * 10; // Development only
+
+        const CUSTOM_CHANNEL = 'urn:x-cast:xyz.rc94.color-trp.events';
+
+        context.addCustomMessageListener(CUSTOM_CHANNEL, function (customEvent) {
+            castDebugLogger.debug("Message received:", customEvent);
+
+            function stopWheel() {
+                if (wheelSpeedModifier !== 0) {
+                    wheelSpeedModifier = 0;
+                    // desiredWheelSpeed = 0;
+                    two.renderer.domElement.style.background = COLORS.splice(COLORS.indexOf(CURRENT_COLOR), 1);
+                }
+            }
+
+            switch (customEvent.data.type) {
+                case 'PING':
+                    context.sendCustomMessage(CUSTOM_CHANNEL, customEvent.senderId, { type: 'PONG' })
+                    break;
+                case 'SHOW_WHEEL':
+                    var t = 0;
+                    two.bind('update', function () {
+                        try {
+                            var elevateTitleModifier = 1.5;
+                            var elevateBgModifier = 2;
+                            var elevateAnimation = function (mod) {
+                                return Math.pow(t, 2) * ((mod + 1) * t - mod);
+                            }
+                            title.translation.y = title.translation.y - elevateAnimation(elevateTitleModifier);
+                            background.translation.y = Math.min(
+                                background.translation.y + elevateAnimation(elevateBgModifier),
+                                two.height
+                            );
+
+
+                            title.opacity = (title.opacity - circ(t / 8)) || 0;
+                            background.opacity = (background.opacity - circ(t / 10)) || 0;
+
+                            if (t > 2) {
+                                game.opacity = Math.min(game.opacity + ((t - 2) / 10), 1);
+                            }
+
+                            t += 0.025;
+                        } catch (error) {
+                            castDebugLogger.error(error);
+                        }
+                    });
+                    break;
+                case 'TOGGLE_DEBUG':
+                    if (!castDebugLogger.debugOverlayElement_) {
+                        // Enable debug logger and show a 'DEBUG MODE' overlay at top left corner.
+                        castDebugLogger.setEnabled(true);
+                        // Show debug overlay
+                        // SHOWING_DEBUG_LOGS = true;
+                        // castDebugLogger.showDebugLogs(true);
+                    }
+                    if (!SHOWING_DEBUG_LOGS) {
+                        castDebugLogger.showDebugLogs(true);
+                    } else {
+                        castDebugLogger.showDebugLogs(false);
+                    }
+                    SHOWING_DEBUG_LOGS = !SHOWING_DEBUG_LOGS;
+                    break;
+                case 'RELOAD':
+                    document.location.reload();
+                    break;
+                case 'SPIN_WHEEL':
+                    WHEEL_SPUN = true;
+                    // desiredWheelSpeed = 10;
+                    wheelSpeedModifier = 13 - ((10 - COLORS.length));
+                    makeWheel();
+                    if (COLORS.length < 1) {
+                        stopWheel();
+                    }
+                    break;
+                case 'STOP_WHEEL':
+                    stopWheel();
+                    break;
+            }
+        });
+
+        context.start(options);
+
+    </script>
+</body>
+
+</html>

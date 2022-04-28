@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="//www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
+    <link rel="stylesheet" href="/assets/style.css?v=3">
+</head>
+
+<body>
+    <fieldset>
+        <br><br>
+        <button onclick="showWheel()">🛞 SHOW<br> WHEEL</button><br><br><br>
+        <button class="wheel-shown" style="display: none;" onclick="spinWheel()">▶️ SPIN<br> WHEEL</button><br><br><br>
+        <button class="wheel-shown" style="display: none;" onclick="stopWheel()">⏹ STOP<br> WHEEL</button><br><br><br>
+        <!-- 
+         <button onclick="toggleDebug()">TOGGLE DEBUG</button><br><br>
+        -->
+    </fieldset>
+    <hr><br>
+    <button onclick="reload()">RELOAD</button>
+
+    <div class="gcast_wrapper">
+        <google-cast-launcher></google-cast-launcher>
+    </div>
+    <script>
+        window._CAST_APP_CONTEXT = null;
+        window._CAST_APP_CUSTOM_CHANNEL = 'urn:x-cast:xyz.rc94.color-trp.events';
+
+        window['__onGCastApiAvailable'] = function (isAvailable) {
+            if (isAvailable) {
+                initializeCastApi();
+            }
+        };
+
+        var castPing;
+
+        function getContext() {
+            if (!window._CAST_APP_CONTEXT) {
+                window._CAST_APP_CONTEXT = cast.framework.CastContext.getInstance();
+            }
+            return window._CAST_APP_CONTEXT;
+        }
+
+        initializeCastApi = function () {
+            cast.framework.CastContext.getInstance().setOptions({
+                receiverApplicationId: '5491D414',
+                autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
+            });
+            var context = getContext();
+            context.addEventListener(
+                cast.framework.CastContextEventType.SESSION_STATE_CHANGED,
+                function (event) {
+                    switch (event.sessionState) {
+                        case cast.framework.SessionState.SESSION_STARTED:
+                        case cast.framework.SessionState.SESSION_RESUMED:
+                            castStarted(context)
+                            break;
+                        case cast.framework.SessionState.SESSION_ENDED:
+                            console.log('CastContext: CastSession disconnected');
+                            clearInterval(castPing);
+                            // Update locally as necessary
+                            break;
+                        default:
+                            console.log(event);
+                    }
+                }
+            );
+        };
+
+        function ensureContext(fn) {
+            function _ensureContext() {
+                var context = getContext();
+                if (!context) {
+                    return function () {
+                        alert("No se ha inicializado el servicio de Chromecast");
+                    }
+                } else {
+                    return fn(context);
+                }
+            }
+            return _ensureContext;
+        }
+
+        function sendMessage(messageObject, successFn, errorFn) {
+            ensureContext(function (context) {
+                try {
+                    context.getCurrentSession().getSessionObj().sendMessage(
+                        window._CAST_APP_CUSTOM_CHANNEL,
+                        messageObject,
+                        function () {
+                            console.log("Message sent:", messageObject)
+                            successFn && successFn();
+                        },
+                        errorFn
+                    )
+                } catch (error) {
+                    alert("Hubo un problema comunicándose con el Chromecast");
+                }
+            })()
+        }
+
+        function showWheel() {
+            sendMessage({
+                type: 'SHOW_WHEEL'
+            }, function () {
+                setTimeout(function () {
+                    var elements = document.querySelectorAll('fieldset button');
+                    elements.forEach(elm => {
+                        if (elm.className == 'wheel-shown') {
+                            elm.style.display = 'block';
+                        } else {
+                            elm.style.display = 'none';
+                        }
+                    })
+                }, 1250)
+            })
+        }
+
+        function spinWheel() {
+            sendMessage({
+                type: 'SPIN_WHEEL'
+            })
+        }
+
+        function stopWheel() {
+            sendMessage({
+                type: 'STOP_WHEEL'
+            })
+        }
+
+        function toggleDebug() {
+            sendMessage({
+                type: 'TOGGLE_DEBUG'
+            })
+        }
+
+        function reload() {
+            sendMessage({
+                type: 'RELOAD'
+            }, function () {
+                document.location.reload();
+            })
+        }
+
+        function castStarted(context) {
+            function ping() {
+                sendMessage(
+                    { type: 'PING' },
+                )
+            }
+            ping();
+            castPing = setInterval(ping, 29 * 1000)
+
+            context.getCurrentSession().getSessionObj().addMessageListener(
+                window._CAST_APP_CUSTOM_CHANNEL,
+                function (namespace, message) {
+                    var message = JSON.parse(message);
+                    console.log("Message received:", message);
+                }
+            )
+        }
+
+        function stopCasting() {
+            clearInterval(castPing);
+            var castSession = cast.framework.CastContext.getInstance().getCurrentSession();
+            // End the session and pass 'true' to indicate
+            // that Web Receiver app should be stopped.
+            castSession && castSession.endSession(true);
+        }
+    </script>
+</body>
+
+</html>
